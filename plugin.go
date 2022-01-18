@@ -165,8 +165,14 @@ func (p *Plugin) Stop() error {
 	return nil
 }
 
-func (p *Plugin) CollectResettable(name endure.Named, r resetter.Resetter) {
+func (p *Plugin) Collects() []interface{} {
+	return []interface{}{
+		p.CollectResettable,
+	}
+}
 
+func (p *Plugin) CollectResettable(name endure.Named, r resetter.Resetter) {
+	p.resettable[name.Name()] = r
 }
 
 func (p *Plugin) Name() string {
