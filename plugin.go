@@ -82,7 +82,7 @@ func (p *Plugin) Init(cfg config.Configurer, log *zap.Logger) error {
 	return nil
 }
 
-func (p *Plugin) Serve() chan error {
+func (p *Plugin) Serve() chan error { //nolint:gocognit
 	const op = errors.Op("reload_plugin_serve")
 	errCh := make(chan error, 1)
 	if p.cfg.Interval < time.Second {
