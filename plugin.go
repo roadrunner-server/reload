@@ -132,9 +132,7 @@ func (p *Plugin) Serve() chan error { //nolint:gocognit
 						if _, ok := p.resettable[name]; ok {
 							err := p.resettable[name].Reset()
 							if err != nil {
-								timer.Stop()
-								errCh <- errors.E(op, err)
-								return
+								p.log.Error("failed to allocate a worker, RR will try to allocate a worker on the following change")
 							}
 						}
 					}
