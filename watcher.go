@@ -1,9 +1,9 @@
 package reload
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -157,7 +157,18 @@ func (w *Watcher) retrieveFilesSingle(serviceName, path string) (map[string]os.F
 		return filesList, nil
 	}
 
-	fileInfoList, err := ioutil.ReadDir(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	fileInfoList, err := f.Readdir(-1)
+	_ = f.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(fileInfoList, func(i, j int) bool { return fileInfoList[i].Name() < fileInfoList[j].Name() })
+
 	if err != nil {
 		return nil, err
 	}
