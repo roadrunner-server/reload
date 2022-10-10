@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/roadrunner-server/api/v2/plugins/config"
-	"github.com/roadrunner-server/api/v2/plugins/resetter"
 	endure "github.com/roadrunner-server/endure/pkg/container"
 	"github.com/roadrunner-server/errors"
 	"go.uber.org/zap"
@@ -21,15 +19,29 @@ const (
 type Plugin struct {
 	cfg        *Config
 	log        *zap.Logger
-	resettable map[string]resetter.Resetter
+	resettable map[string]Resetter
 
 	watcher  *Watcher
 	services map[string]interface{}
 	stopc    chan struct{}
 }
 
+// Resetter interface
+type Resetter interface {
+	// Reset reload plugin
+	Reset() error
+}
+
+type Configurer interface {
+	// UnmarshalKey takes a single key and unmarshal it into a Struct.
+	UnmarshalKey(name string, out any) error
+
+	// Has checks if config section exists.
+	Has(name string) bool
+}
+
 // Init controller service
-func (p *Plugin) Init(cfg config.Configurer, log *zap.Logger) error {
+func (p *Plugin) Init(cfg Configurer, log *zap.Logger) error {
 	const op = errors.Op("reload_plugin_init")
 	if !cfg.Has(PluginName) {
 		return errors.E(op, errors.Disabled)
@@ -77,7 +89,7 @@ func (p *Plugin) Init(cfg config.Configurer, log *zap.Logger) error {
 		return errors.E(op, err)
 	}
 
-	p.resettable = make(map[string]resetter.Resetter, 2)
+	p.resettable = make(map[string]Resetter, 2)
 
 	return nil
 }
@@ -169,7 +181,7 @@ func (p *Plugin) Collects() []interface{} {
 	}
 }
 
-func (p *Plugin) CollectResettable(name endure.Named, r resetter.Resetter) {
+func (p *Plugin) CollectResettable(name endure.Named, r Resetter) {
 	p.resettable[name.Name()] = r
 }
 
