@@ -1,11 +1,12 @@
 package reload
 
 import (
+	"context"
 	"os"
 	"strings"
 	"time"
 
-	endure "github.com/roadrunner-server/endure/pkg/container"
+	"github.com/roadrunner-server/endure/v2/dep"
 	"github.com/roadrunner-server/errors"
 	"go.uber.org/zap"
 )
@@ -23,25 +24,30 @@ type Plugin struct {
 
 	watcher  *Watcher
 	services map[string]interface{}
-	stopc    chan struct{}
+	stopCh   chan struct{}
+}
+
+type Logger interface {
+	NamedLogger(name string) *zap.Logger
 }
 
 // Resetter interface
 type Resetter interface {
 	// Reset reload plugin
 	Reset() error
+	// Name of the plugin
+	Name() string
 }
 
 type Configurer interface {
 	// UnmarshalKey takes a single key and unmarshal it into a Struct.
 	UnmarshalKey(name string, out any) error
-
 	// Has checks if config section exists.
 	Has(name string) bool
 }
 
 // Init controller service
-func (p *Plugin) Init(cfg Configurer, log *zap.Logger) error {
+func (p *Plugin) Init(cfg Configurer, log Logger) error {
 	const op = errors.Op("reload_plugin_init")
 	if !cfg.Has(PluginName) {
 		return errors.E(op, errors.Disabled)
@@ -55,8 +61,8 @@ func (p *Plugin) Init(cfg Configurer, log *zap.Logger) error {
 
 	p.cfg.InitDefaults()
 
-	p.log = log
-	p.stopc = make(chan struct{}, 1)
+	p.log = log.NamedLogger(PluginName)
+	p.stopCh = make(chan struct{}, 1)
 	p.services = make(map[string]interface{})
 
 	configs := make([]WatcherConfig, 0, len(p.cfg.Plugins))
@@ -151,7 +157,7 @@ func (p *Plugin) Serve() chan error { //nolint:gocognit
 					// zero map
 					updated = make(map[string]ServiceConfig, len(p.cfg.Plugins))
 				}
-			case <-p.stopc:
+			case <-p.stopCh:
 				timer.Stop()
 				return
 			}
@@ -169,20 +175,30 @@ func (p *Plugin) Serve() chan error { //nolint:gocognit
 	return errCh
 }
 
-func (p *Plugin) Stop() error {
-	p.watcher.Stop()
-	p.stopc <- struct{}{}
-	return nil
-}
+func (p *Plugin) Stop(ctx context.Context) error {
+	st := make(chan struct{}, 1)
 
-func (p *Plugin) Collects() []interface{} {
-	return []interface{}{
-		p.CollectResettable,
+	go func() {
+		p.watcher.Stop()
+		p.stopCh <- struct{}{}
+		st <- struct{}{}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-st:
+		return nil
 	}
 }
 
-func (p *Plugin) CollectResettable(name endure.Named, r Resetter) {
-	p.resettable[name.Name()] = r
+func (p *Plugin) Collects() []*dep.In {
+	return []*dep.In{
+		dep.Fits(func(pp any) {
+			res := pp.(Resetter)
+			p.resettable[res.Name()] = res
+		}, (*Resetter)(nil)),
+	}
 }
 
 func (p *Plugin) Name() string {
