@@ -1,9 +1,9 @@
-module github.com/roadrunner-server/reload/v3
+module github.com/roadrunner-server/reload/v4
 
 go 1.19
 
 require (
-	github.com/roadrunner-server/endure/v2 v2.0.0-beta.1
+	github.com/roadrunner-server/endure/v2 v2.0.0-rc.2
 	github.com/roadrunner-server/errors v1.2.0
 	go.uber.org/zap v1.24.0
 )
