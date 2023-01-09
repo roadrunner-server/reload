@@ -175,7 +175,7 @@ func (p *Plugin) Stop() error {
 	return nil
 }
 
-func (p *Plugin) Collects() []interface{} {
+func (p *Plugin) Collects() []any {
 	return []interface{}{
 		p.CollectResettable,
 	}
